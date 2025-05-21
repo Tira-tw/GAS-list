@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>加油預覽表單</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      max-width: 500px;
+      margin: auto;
+    }
+
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 12px;
+      width: 100%;
+      background: #007bff;
+      color: white;
+      font-size: 16px;
+      border: none;
+      border-radius: 5px;
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 999;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.5);
+    }
+
+    .modal-content {
+      background-color: #fff;
+      margin: 10% auto;
+      padding: 20px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 400px;
+      position: relative;
+    }
+
+    .close {
+      position: absolute;
+      right: 15px;
+      top: 10px;
+      font-size: 24px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .barcode {
+      margin-top: 10px;
+    }
+
+    canvas {
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h2>加油表單</h2>
+
+  <p>本網站瀏覽次數：<span id="visitCount">0</span></p>
+  <p>表單使用次數：<span id="submitCount">0</span></p>
+
+  <form id="fuelForm">
+    <label>加油類別:
+      <select name="fuelType" required>
+        <option value="92汽油">92汽油</option>
+        <option value="95汽油">95汽油</option>
+        <option value="98汽油">98汽油</option>
+        <option value="超級柴油">超級柴油</option>
+      </select>
+    </label>
+
+    <label>加多少（元 或 輸入「加滿」/「跳停」）:
+      <input type="text" name="amount" placeholder="例如：500 或 加滿、跳停" required>
+    </label>
+
+    <label>統編 (可留空):
+      <input type="text" name="taxId" maxlength="8">
+    </label>
+
+    <label>載具 (可留空):
+      <input type="text" name="carrierId">
+    </label>
+
+    <label>會員 (可留空):
+      <input type="text" name="memberId">
+    </label>
+
+    <label>是否需要汽油精:
+      <select name="fuelAdditive" required>
+        <option value="需要">需要</option>
+        <option value="不需要">不需要</option>
+      </select>
+    </label>
+
+    <button type="submit">送出並預覽</button>
+  </form>
+
+  <!-- Modal -->
+  <div id="previewModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="document.getElementById('previewModal').style.display='none'">&times;</span>
+      <h3>預覽結果</h3>
+      <p><strong>加油類別:</strong> <span id="prevFuelType"></span></p>
+      <p><strong>加多少:</strong> <span id="prevAmount"></span></p>
+      <p><strong>統編:</strong> <span id="prevTaxId"></span></p>
+      <p><strong>載具:</strong> <span id="prevCarrier"></span></p>
+      <div class="barcode"><canvas id="carrierBarcode"></canvas></div>
+      <p><strong>會員:</strong> <span id="prevMember"></span></p>
+      <div class="barcode"><canvas id="memberBarcode"></canvas></div>
+      <p><strong>是否需要汽油精:</strong> <span id="prevFuelAdditive"></span></p>
+    </div>
+  </div>
+
+  <script>
+    // 初始化瀏覽次數
+    let visitCount = localStorage.getItem("visitCount");
+    visitCount = visitCount ? parseInt(visitCount) + 1 : 1;
+    localStorage.setItem("visitCount", visitCount);
+    document.getElementById("visitCount").textContent = visitCount;
+
+    // 初始化送出次數
+    let submitCount = localStorage.getItem("submitCount") || 0;
+    document.getElementById("submitCount").textContent = submitCount;
+
+    document.getElementById('fuelForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      // 送出次數加一
+      submitCount = parseInt(submitCount) + 1;
+      localStorage.setItem("submitCount", submitCount);
+      document.getElementById("submitCount").textContent = submitCount;
+
+      const form = e.target;
+      const fuelType = form.fuelType.value;
+      const amount = form.amount.value.trim() || '未填寫';
+      const taxId = form.taxId.value.trim() || '未填寫';
+      const carrier = form.carrierId.value.trim() || '未填寫';
+      const member = form.memberId.value.trim() || '未填寫';
+      const fuelAdditive = form.fuelAdditive.value;
+
+      document.getElementById('prevFuelType').textContent = fuelType;
+      document.getElementById('prevAmount').textContent = amount;
+      document.getElementById('prevTaxId').textContent = taxId;
+      document.getElementById('prevCarrier').textContent = carrier;
+      document.getElementById('prevMember').textContent = member;
+      document.getElementById('prevFuelAdditive').textContent = fuelAdditive;
+
+      if (carrier !== '未填寫') {
+        JsBarcode("#carrierBarcode", carrier, {
+          format: "CODE128",
+          displayValue: true,
+          fontSize: 16
+        });
+      } else {
+        const ctx = document.getElementById('carrierBarcode').getContext('2d');
+        ctx.clearRect(0, 0, 300, 100);
+      }
+
+      if (member !== '未填寫') {
+        JsBarcode("#memberBarcode", member, {
+          format: "CODE128",
+          displayValue: true,
+          fontSize: 16
+        });
+      } else {
+        const ctx = document.getElementById('memberBarcode').getContext('2d');
+        ctx.clearRect(0, 0, 300, 100);
+      }
+
+      document.getElementById('previewModal').style.display = 'block';
+    });
+
+    // 點擊外部區域關閉 modal
+    window.onclick = function(event) {
+      const modal = document.getElementById('previewModal');
+      if (event.target === modal) {
+        modal.style.display = "none";
+      }
+    };
+  </script>
+</body>
+</html>
