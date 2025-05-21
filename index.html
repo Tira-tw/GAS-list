@@ -139,11 +139,18 @@
       <h3 id="previewTitle">預覽結果</h3>
       <p><strong>加油類別:</strong> <span id="prevFuelType"></span></p>
       <p><strong>加多少:</strong> <span id="prevAmount"></span></p>
-      <p><strong>統編:</strong> <span id="prevTaxId"></span></p>
-      <p><strong>載具:</strong> <span id="prevCarrier"></span></p>
-      <div class="barcode"><canvas id="carrierBarcode"></canvas></div>
-      <p><strong>會員:</strong> <span id="prevMember"></span></p>
-      <div class="barcode"><canvas id="memberBarcode"></canvas></div>
+
+      <!-- 以下欄位預設隱藏，由 JS 動態控制顯示 -->
+      <p id="taxIdRow" style="display:none;"><strong>統編:</strong> <span id="prevTaxId"></span></p>
+      <div id="carrierRow" class="barcode" style="display:none;">
+        <p><strong>載具:</strong> <span id="prevCarrier"></span></p>
+        <canvas id="carrierBarcode"></canvas>
+      </div>
+      <div id="memberRow" class="barcode" style="display:none;">
+        <p><strong>會員:</strong> <span id="prevMember"></span></p>
+        <canvas id="memberBarcode"></canvas>
+      </div>
+
       <p><strong>作者:</strong> <span id="prevAuthor"></span></p>
       <p><strong>是否需要汽油精:</strong> <span id="prevFuelAdditive"></span></p>
     </div>
@@ -176,7 +183,6 @@
     // 固定作者名字
     const fixedAuthorName = "Aw Wen | 本名不公開";
 
-    // 表單提交預覽
     document.getElementById("fuelForm").addEventListener("submit", function(e){
       e.preventDefault();
 
@@ -189,83 +195,103 @@
       const form = e.target;
       const fuelType = form.fuelType.value;
       const amount = form.amount.value.trim() || "未填寫";
-      const taxId = form.taxId.value.trim() || "未填寫";
-      const carrier = form.carrierId.value.trim() || "未填寫";
-      const member = form.memberId.value.trim() || "未填寫";
+
+      // 這三個欄位要動態決定是否顯示
+      const taxId = form.taxId.value.trim();
+      const carrier = form.carrierId.value.trim();
+      const member = form.memberId.value.trim();
+
       const fuelAdditive = form.fuelAdditive.value;
 
+      // 基本必顯示欄位
       document.getElementById("prevFuelType").textContent = fuelType;
       document.getElementById("prevAmount").textContent = amount;
-      document.getElementById("prevTaxId").textContent = taxId;
-      document.getElementById("prevCarrier").textContent = carrier;
-      document.getElementById("prevMember").textContent = member;
       document.getElementById("prevAuthor").textContent = fixedAuthorName;
       document.getElementById("prevFuelAdditive").textContent = fuelAdditive;
 
-      if (carrier !== "未填寫") {
-        JsBarcode("#carrierBarcode", carrier, {format: "CODE128", width:2, height:40});
+      // 動態控制「統編」欄位
+      if(taxId){
+        document.getElementById("taxIdRow").style.display = "block";
+        document.getElementById("prevTaxId").textContent = taxId;
       } else {
-        JsBarcode("#carrierBarcode", "", {displayValue:false});
+        document.getElementById("taxIdRow").style.display = "none";
       }
 
-      if (member !== "未填寫") {
+      // 動態控制「載具」欄位和條碼
+      if(carrier){
+        document.getElementById("carrierRow").style.display = "block";
+        document.getElementById("prevCarrier").textContent = carrier;
+        JsBarcode("#carrierBarcode", carrier, {format: "CODE128", width:2, height:40});
+      } else {
+        document.getElementById("carrierRow").style.display = "none";
+        // 清空載具條碼畫布
+        const canvasCarrier = document.getElementById("carrierBarcode");
+        const ctxCarrier = canvasCarrier.getContext("2d");
+        ctxCarrier.clearRect(0, 0, canvasCarrier.width, canvasCarrier.height);
+      }
+
+      // 動態控制「會員」欄位和條碼
+      if(member){
+        document.getElementById("memberRow").style.display = "block";
+        document.getElementById("prevMember").textContent = member;
         JsBarcode("#memberBarcode", member, {format: "CODE128", width:2, height:40});
       } else {
-        JsBarcode("#memberBarcode", "", {displayValue:false});
+        document.getElementById("memberRow").style.display = "none";
+        // 清空會員條碼畫布
+        const canvasMember = document.getElementById("memberBarcode");
+        const ctxMember = canvasMember.getContext("2d");
+        ctxMember.clearRect(0, 0, canvasMember.width, canvasMember.height);
       }
 
       openPreviewModal();
     });
 
-    // Modal 控制
+    // 預覽 Modal 控制
     const previewModal = document.getElementById("previewModal");
-    const termsModal = document.getElementById("termsModal");
     const closePreviewBtn = previewModal.querySelector(".close");
-
+    closePreviewBtn.addEventListener("click", () => {
+      previewModal.style.display = "none";
+    });
+    // 按 ESC 可關閉 Modal
+    window.addEventListener("keydown", e => {
+      if (e.key === "Escape" && previewModal.style.display === "block") {
+        previewModal.style.display = "none";
+      }
+    });
     function openPreviewModal(){
       previewModal.style.display = "block";
-      previewModal.setAttribute("aria-hidden", "false");
     }
-    function closePreviewModal(){
-      previewModal.style.display = "none";
-      previewModal.setAttribute("aria-hidden", "true");
-    }
-    closePreviewBtn.onclick = closePreviewModal;
-    window.onclick = function(event){
-      if(event.target === previewModal){
-        closePreviewModal();
-      }
-      if(event.target === termsModal){
-        // 強制同意，不關閉
-      }
-    };
 
-    // 條款 Modal 邏輯
+    // 服務條款 Modal 控制
+    const termsModal = document.getElementById("termsModal");
     const agreeBtn = document.getElementById("agreeBtn");
-
-    function openTermsModal(){
+    function openTermsModal() {
       termsModal.style.display = "block";
-      termsModal.setAttribute("aria-hidden", "false");
-      // 對焦同意鈕，提高可訪問性
-      agreeBtn.focus();
+      termsModal.focus();
     }
-    function closeTermsModal(){
-      termsModal.style.display = "none";
-      termsModal.setAttribute("aria-hidden", "true");
-    }
-
     agreeBtn.addEventListener("click", () => {
-      localStorage.setItem("termsAccepted", "yes");
-      closeTermsModal();
-      alert("感謝您同意使用條款，現在可以使用本服務。");
+      localStorage.setItem("termsAccepted", "true");
+      termsModal.style.display = "none";
+      alert("感謝您同意使用條款，請再次提交表單。");
     });
 
-    // 首次訪問自動彈出條款
-    window.onload = function(){
-      if(!localStorage.getItem("termsAccepted")){
+    // 頁面載入時檢查是否已同意條款
+    window.addEventListener("load", () => {
+      if (!localStorage.getItem("termsAccepted")) {
         openTermsModal();
       }
-    };
+    });
+
+    // 點擊 Modal 背景關閉（僅針對條款）
+    window.addEventListener("click", (e) => {
+      if (e.target === termsModal) {
+        alert("請先同意使用條款才能使用本服務。");
+        openTermsModal();
+      }
+      if (e.target === previewModal) {
+        previewModal.style.display = "none";
+      }
+    });
   </script>
 </body>
 </html>
