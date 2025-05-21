@@ -3,22 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <title>加油預覽表單</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
   <style>
     body {
-      font-family: sans-serif;
+      font-family: "微軟正黑體", sans-serif;
       padding: 20px;
       max-width: 500px;
       margin: auto;
+      background: #f5f8fa;
     }
     label {
       display: block;
       margin-top: 15px;
       font-weight: bold;
     }
-    input,
-    select {
+    input, select {
       width: 100%;
       padding: 10px;
       margin-top: 5px;
@@ -34,18 +34,20 @@
       font-size: 16px;
       border: none;
       border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
     }
     /* Modal */
     .modal {
       display: none;
       position: fixed;
       z-index: 999;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
       overflow: auto;
-      background-color: rgba(0, 0, 0, 0.5);
+      background-color: rgba(0,0,0,0.5);
     }
     .modal-content {
       background-color: #fff;
@@ -55,6 +57,7 @@
       width: 90%;
       max-width: 400px;
       position: relative;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     }
     .close {
       position: absolute;
@@ -63,12 +66,30 @@
       font-size: 24px;
       font-weight: bold;
       cursor: pointer;
+      color: #888;
+    }
+    .close:hover {
+      color: #333;
     }
     .barcode {
       margin-top: 10px;
+      text-align: center;
     }
     canvas {
       max-width: 100%;
+    }
+    footer {
+      margin-top: 40px;
+      font-size: 14px;
+      color: #666;
+      text-align: center;
+    }
+    footer a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    footer a:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
@@ -111,15 +132,11 @@
     <button type="submit">送出並預覽</button>
   </form>
 
-  <!-- Modal -->
-  <div id="previewModal" class="modal">
+  <!-- 預覽結果 Modal -->
+  <div id="previewModal" class="modal" aria-modal="true" role="dialog" aria-labelledby="previewTitle">
     <div class="modal-content">
-      <span
-        class="close"
-        onclick="document.getElementById('previewModal').style.display='none'"
-        >&times;</span
-      >
-      <h3>預覽結果</h3>
+      <span class="close" aria-label="關閉預覽" tabindex="0" role="button">&times;</span>
+      <h3 id="previewTitle">預覽結果</h3>
       <p><strong>加油類別:</strong> <span id="prevFuelType"></span></p>
       <p><strong>加多少:</strong> <span id="prevAmount"></span></p>
       <p><strong>統編:</strong> <span id="prevTaxId"></span></p>
@@ -132,12 +149,42 @@
     </div>
   </div>
 
+  <!-- 服務條款 Modal -->
+  <div id="termsModal" class="modal" aria-modal="true" role="dialog" aria-labelledby="termsTitle" tabindex="-1">
+    <div class="modal-content" style="max-height: 70vh; overflow-y: auto;">
+      <h2 id="termsTitle">使用條款與免責聲明</h2>
+      <p>歡迎您使用本網站提供的加油模擬工具。請在使用前詳細閱讀以下條款，並同意後方可繼續使用。</p>
+      <ul>
+        <li>本服務為免費加油模擬工具，僅供參考與學習用途，非正式交易或發票系統。</li>
+        <li>本網站與任何加油業者或發票系統無直接關聯，且不保證資料之準確性及完整性。</li>
+        <li>使用本服務所產生之任何資訊，均不具法律效力，請勿用於正式交易或報帳。</li>
+        <li>本服務提供者不對因使用本服務而導致的任何損失負責，使用者須自行承擔風險。</li>
+        <li>本服務保留隨時修改或終止服務與條款的權利，恕不另行通知。</li>
+      </ul>
+      <div style="text-align:center; margin-top:20px;">
+        <button id="agreeBtn" style="background:#28a745; color:#fff; padding:10px 20px; border:none; border-radius:5px; font-size:16px; cursor:pointer;">我已閱讀並同意</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>© 2025 Aw Wen | 本名不公開</p>
+    <p><a href="terms.html" target="_blank" rel="noopener noreferrer">查看完整使用條款與免責聲明</a></p>
+  </footer>
+
   <script>
-    // 固定作者名字，請改成你的名字
+    // 固定作者名字
     const fixedAuthorName = "Aw Wen | 本名不公開";
 
-    document.getElementById("fuelForm").addEventListener("submit", function (e) {
+    // 表單提交預覽
+    document.getElementById("fuelForm").addEventListener("submit", function(e){
       e.preventDefault();
+
+      if (!localStorage.getItem("termsAccepted")) {
+        alert("請先同意使用條款與免責聲明才能使用本服務。");
+        openTermsModal();
+        return;
+      }
 
       const form = e.target;
       const fuelType = form.fuelType.value;
@@ -156,35 +203,67 @@
       document.getElementById("prevFuelAdditive").textContent = fuelAdditive;
 
       if (carrier !== "未填寫") {
-        JsBarcode("#carrierBarcode", carrier, {
-          format: "CODE128",
-          displayValue: true,
-          fontSize: 16,
-        });
+        JsBarcode("#carrierBarcode", carrier, {format: "CODE128", width:2, height:40});
       } else {
-        const ctx = document.getElementById("carrierBarcode").getContext("2d");
-        ctx.clearRect(0, 0, 300, 100);
+        JsBarcode("#carrierBarcode", "", {displayValue:false});
       }
 
       if (member !== "未填寫") {
-        JsBarcode("#memberBarcode", member, {
-          format: "CODE128",
-          displayValue: true,
-          fontSize: 16,
-        });
+        JsBarcode("#memberBarcode", member, {format: "CODE128", width:2, height:40});
       } else {
-        const ctx = document.getElementById("memberBarcode").getContext("2d");
-        ctx.clearRect(0, 0, 300, 100);
+        JsBarcode("#memberBarcode", "", {displayValue:false});
       }
 
-      document.getElementById("previewModal").style.display = "block";
+      openPreviewModal();
     });
 
-    // 點擊外部區域關閉 modal
-    window.onclick = function (event) {
-      const modal = document.getElementById("previewModal");
-      if (event.target === modal) {
-        modal.style.display = "none";
+    // Modal 控制
+    const previewModal = document.getElementById("previewModal");
+    const termsModal = document.getElementById("termsModal");
+    const closePreviewBtn = previewModal.querySelector(".close");
+
+    function openPreviewModal(){
+      previewModal.style.display = "block";
+      previewModal.setAttribute("aria-hidden", "false");
+    }
+    function closePreviewModal(){
+      previewModal.style.display = "none";
+      previewModal.setAttribute("aria-hidden", "true");
+    }
+    closePreviewBtn.onclick = closePreviewModal;
+    window.onclick = function(event){
+      if(event.target === previewModal){
+        closePreviewModal();
+      }
+      if(event.target === termsModal){
+        // 強制同意，不關閉
+      }
+    };
+
+    // 條款 Modal 邏輯
+    const agreeBtn = document.getElementById("agreeBtn");
+
+    function openTermsModal(){
+      termsModal.style.display = "block";
+      termsModal.setAttribute("aria-hidden", "false");
+      // 對焦同意鈕，提高可訪問性
+      agreeBtn.focus();
+    }
+    function closeTermsModal(){
+      termsModal.style.display = "none";
+      termsModal.setAttribute("aria-hidden", "true");
+    }
+
+    agreeBtn.addEventListener("click", () => {
+      localStorage.setItem("termsAccepted", "yes");
+      closeTermsModal();
+      alert("感謝您同意使用條款，現在可以使用本服務。");
+    });
+
+    // 首次訪問自動彈出條款
+    window.onload = function(){
+      if(!localStorage.getItem("termsAccepted")){
+        openTermsModal();
       }
     };
   </script>
